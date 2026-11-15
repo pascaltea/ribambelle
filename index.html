@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ribambelle</title>
+<meta name="description" content="La carte participative des sorties en famille, filtrées par âge.">
+<meta name="theme-color" content="#0F6E66">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* required styles */
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+	position: absolute;
+	left: 0;
+	top: 0;
+	}
+.leaflet-container {
+	overflow: hidden;
+	}
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	-webkit-user-select: none;
+	   -moz-user-select: none;
+	        user-select: none;
+	  -webkit-user-drag: none;
+	}
+/* Prevents IE11 from highlighting tiles in blue */
+.leaflet-tile::selection {
+	background: transparent;
+}
+/* Safari renders non-retina tile on retina better with this, but Chrome is worse */
+.leaflet-safari .leaflet-tile {
+	image-rendering: -webkit-optimize-contrast;
+	}
+/* hack that prevents hw layers "stretching" when loading new tiles */
+.leaflet-safari .leaflet-tile-container {
+	width: 1600px;
+	height: 1600px;
+	-webkit-transform-origin: 0 0;
+	}
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+	display: block;
+	}
+/* .leaflet-container svg: reset svg max-width decleration shipped in Joomla! (joomla.org) 3.x */
+/* .leaflet-container img: map is broken in FF if you have max-width: 100% on tiles */
+.leaflet-container .leaflet-overlay-pane svg {
+	max-width: none !important;
+	max-height: none !important;
+	}
+.leaflet-container .leaflet-marker-pane img,
+.leaflet-container .leaflet-shadow-pane img,
+.leaflet-container .leaflet-tile-pane img,
+.leaflet-container img.leaflet-image-layer,
+.leaflet-container .leaflet-tile {
+	max-width: none !important;
+	max-height: none !important;
+	width: auto;
+	padding: 0;
+	}
+
+.leaflet-container img.leaflet-tile {
+	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
+	mix-blend-mode: plus-lighter;
+}
+
+.leaflet-container.leaflet-touch-zoom {
+	-ms-touch-action: pan-x pan-y;
+	touch-action: pan-x pan-y;
+	}
+.leaflet-container.leaflet-touch-drag {
+	-ms-touch-action: pinch-zoom;
+	/* Fallback for FF which doesn't support pinch-zoom */
+	touch-action: none;
+	touch-action: pinch-zoom;
+}
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom {
+	-ms-touch-action: none;
+	touch-action: none;
+}
+.leaflet-container {
+	-webkit-tap-highlight-color: transparent;
+}
+.leaflet-container a {
+	-webkit-tap-highlight-color: rgba(51, 181, 229, 0.4);
+}
+.leaflet-tile {
+	filter: inherit;
+	visibility: hidden;
+	}
+.leaflet-tile-loaded {
+	visibility: inherit;
+	}
+.leaflet-zoom-box {
+	width: 0;
+	height: 0;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	z-index: 800;
+	}
+/* workaround for https://bugzilla.mozilla.org/show_bug.cgi?id=888319 */
+.leaflet-overlay-pane svg {
+	-moz-user-select: none;
+	}
+
+.leaflet-pane         { z-index: 400; }
+
+.leaflet-tile-pane    { z-index: 200; }
+.leaflet-overlay-pane { z-index: 400; }
+.leaflet-shadow-pane  { z-index: 500; }
+.leaflet-marker-pane  { z-index: 600; }
+.leaflet-tooltip-pane   { z-index: 650; }
+.leaflet-popup-pane   { z-index: 700; }
+
+.leaflet-map-pane canvas { z-index: 100; }
+.leaflet-map-pane svg    { z-index: 200; }
+
+.leaflet-vml-shape {
+	width: 1px;
+	height: 1px;
+	}
+.lvml {
+	behavior: none;
+	display: inline-block;
+	position: absolute;
+	}
+
+
+/* control positioning */
+
+.leaflet-control {
+	position: relative;
+	z-index: 800;
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+.leaflet-top,
+.leaflet-bottom {
+	position: absolute;
+	z-index: 1000;
+	pointer-events: none;
+	}
+.leaflet-top {
+	top: 0;
+	}
+.leaflet-right {
+	right: 0;
+	}
+.leaflet-bottom {
+	bottom: 0;
+	}
+.leaflet-left {
+	left: 0;
+	}
+.leaflet-control {
+	float: left;
+	clear: both;
+	}
+.leaflet-right .leaflet-control {
+	float: right;
+	}
+.leaflet-top .leaflet-control {
+	margin-top: 10px;
+	}
+.leaflet-bottom .leaflet-control {
+	margin-bottom: 10px;
+	}
+.leaflet-left .leaflet-control {
+	margin-left: 10px;
+	}
+.leaflet-right .leaflet-control {
+	margin-right: 10px;
+	}
+
+
+/* zoom and fade animations */
+
+.leaflet-fade-anim .leaflet-popup {
+	opacity: 0;
+	-webkit-transition: opacity 0.2s linear;
+	   -moz-transition: opacity 0.2s linear;
+	        transition: opacity 0.2s linear;
+	}
+.leaflet-fade-anim .leaflet-map-pane .leaflet-popup {
+	opacity: 1;
+	}
+.leaflet-zoom-animated {
+	-webkit-transform-origin: 0 0;
+	    -ms-transform-origin: 0 0;
+	        transform-origin: 0 0;
+	}
+svg.leaflet-zoom-animated {
+	will-change: transform;
+}
+
+.leaflet-zoom-anim .leaflet-zoom-animated {
+	-webkit-transition: -webkit-transform 0.25s cubic-bezier(0,0,0.25,1);
+	   -moz-transition:    -moz-transform 0.25s cubic-bezier(0,0,0.25,1);
+	        transition:         transform 0.25s cubic-bezier(0,0,0.25,1);
+	}
+.leaflet-zoom-anim .leaflet-tile,
+.leaflet-pan-anim .leaflet-tile {
+	-webkit-transition: none;
+	   -moz-transition: none;
+	        transition: none;
+	}
+
+.leaflet-zoom-anim .leaflet-zoom-hide {
+	visibility: hidden;
+	}
+
+
+/* cursors */
+
+.leaflet-interactive {
+	cursor: pointer;
+	}
+.leaflet-grab {
+	cursor: -webkit-grab;
+	cursor:    -moz-grab;
+	cursor:         grab;
+	}
+.leaflet-crosshair,
+.leaflet-crosshair .leaflet-interactive {
+	cursor: crosshair;
+	}
+.leaflet-popup-pane,
+.leaflet-control {
+	cursor: auto;
+	}
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+	cursor: move;
+	cursor: -webkit-grabbing;
+	cursor:    -moz-grabbing;
+	cursor:         grabbing;
+	}
+
+/* marker & overlays interactivity */
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-image-layer,
+.leaflet-pane > svg path,
+.leaflet-tile-container {
+	pointer-events: none;
+	}
+
+.leaflet-marker-icon.leaflet-interactive,
+.leaflet-image-layer.leaflet-interactive,
+.leaflet-pane > svg path.leaflet-interactive,
+svg.leaflet-image-layer.leaflet-interactive path {
+	pointer-events: visiblePainted; /* IE 9-10 doesn't have auto */
+	pointer-events: auto;
+	}
+
+/* visual tweaks */
+
+.leaflet-container {
+	background: #ddd;
+	outline-offset: 1px;
+	}
+.leaflet-container a {
+	color: #0078A8;
+	}
+.leaflet-zoom-box {
+	border: 2px dotted #38f;
+	background: rgba(255,255,255,0.5);
+	}
+
+
+/* general typography */
+.leaflet-container {
+	font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+	font-size: 12px;
+	font-size: 0.75rem;
+	line-height: 1.5;
+	}
+
+
+/* general toolbar styles */
+
+.leaflet-bar {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.65);
+	border-radius: 4px;
+	}
+.leaflet-bar a {
+	background-color: #fff;
+	border-bottom: 1px solid #ccc;
+	width: 26px;
+	height: 26px;
+	line-height: 26px;
+	display: block;
+	text-align: center;
+	text-decoration: none;
+	color: black;
+	}
+.leaflet-bar a,
+.leaflet-control-layers-toggle {
+	background-position: 50% 50%;
+	background-repeat: no-repeat;
+	display: block;
+	}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+	background-color: #f4f4f4;
+	}
+.leaflet-bar a:first-child {
+	border-top-left-radius: 4px;
+	border-top-right-radius: 4px;
+	}
+.leaflet-bar a:last-child {
+	border-bottom-left-radius: 4px;
+	border-bottom-right-radius: 4px;
+	border-bottom: none;
+	}
+.leaflet-bar a.leaflet-disabled {
+	cursor: default;
+	background-color: #f4f4f4;
+	color: #bbb;
+	}
+
+.leaflet-touch .leaflet-bar a {
+	width: 30px;
+	height: 30px;
+	line-height: 30px;
+	}
+.leaflet-touch .leaflet-bar a:first-child {
+	border-top-left-radius: 2px;
+	border-top-right-radius: 2px;
+	}
+.leaflet-touch .leaflet-bar a:last-child {
+	border-bottom-left-radius: 2px;
+	border-bottom-right-radius: 2px;
+	}
+
+/* zoom control */
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+	font: bold 18px 'Lucida Console', Monaco, monospace;
+	text-indent: 1px;
+	}
+
+.leaflet-touch .leaflet-control-zoom-in, .leaflet-touch .leaflet-control-zoom-out  {
+	font-size: 22px;
+	}
+
+
+/* layers control */
+
+.leaflet-control-layers {
+	box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+	background: #fff;
+	border-radius: 5px;
+	}
+.leaflet-control-layers-toggle {
+	background-image: none;
+	width: 36px;
+	height: 36px;
+	}
+.leaflet-retina .leaflet-control-layers-toggle {
+	background-image: none;
+	background-size: 26px 26px;
+	}
+.leaflet-touch .leaflet-control-layers-toggle {
+	width: 44px;
+	height: 44px;
+	}
+.leaflet-control-layers .leaflet-control-layers-list,
+.leaflet-control-layers-expanded .leaflet-control-layers-toggle {
+	display: none;
+	}
+.leaflet-control-layers-expanded .leaflet-control-layers-list {
+	display: block;
+	position: relative;
+	}
+.leaflet-control-layers-expanded {
+	padding: 6px 10px 6px 6px;
+	color: #333;
+	background: #fff;
+	}
+.leaflet-control-layers-scrollbar {
+	overflow-y: scroll;
+	overflow-x: hidden;
+	padding-right: 5px;
+	}
+.leaflet-control-layers-selector {
+	margin-top: 2px;
+	position: relative;
+	top: 1px;
+	}
+.leaflet-control-layers label {
+	display: block;
+	font-size: 13px;
+	font-size: 1.08333em;
+	}
+.leaflet-control-layers-separator {
+	height: 0;
+	border-top: 1px solid #ddd;
+	margin: 5px -10px 5px -6px;
+	}
+
+/* Default icon URLs */
+.leaflet-default-icon-path { /* used only in path-guessing heuristic, see L.Icon.Default */
+	background-image: none;
+	}
+
+
+/* attribution and scale controls */
+
+.leaflet-container .leaflet-control-attribution {
+	background: #fff;
+	background: rgba(255, 255, 255, 0.8);
+	margin: 0;
+	}
+.leaflet-control-attribution,
+.leaflet-control-scale-line {
+	padding: 0 5px;
+	color: #333;
+	line-height: 1.4;
+	}
+.leaflet-control-attribution a {
+	text-decoration: none;
+	}
+.leaflet-control-attribution a:hover,
+.leaflet-control-attribution a:focus {
+	text-decoration: underline;
+	}
+.leaflet-attribution-flag {
+	display: inline !important;
+	vertical-align: baseline !important;
+	width: 1em;
+	height: 0.6669em;
+	}
+.leaflet-left .leaflet-control-scale {
+	margin-left: 5px;
+	}
+.leaflet-bottom .leaflet-control-scale {
+	margin-bottom: 5px;
+	}
+.leaflet-control-scale-line {
+	border: 2px solid #777;
+	border-top: none;
+	line-height: 1.1;
+	padding: 2px 5px 1px;
+	white-space: nowrap;
+	-moz-box-sizing: border-box;
+	     box-sizing: border-box;
+	background: rgba(255, 255, 255, 0.8);
+	text-shadow: 1px 1px #fff;
+	}
+.leaflet-control-scale-line:not(:first-child) {
+	border-top: 2px solid #777;
+	border-bottom: none;
+	margin-top: -2px;
+	}
+.leaflet-control-scale-line:not(:first-child):not(:last-child) {
+	border-bottom: 2px solid #777;
+	}
+
+.leaflet-touch .leaflet-control-attribution,
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	box-shadow: none;
+	}
+.leaflet-touch .leaflet-control-layers,
+.leaflet-touch .leaflet-bar {
+	border: 2px solid rgba(0,0,0,0.2);
+	background-clip: padding-box;
+	}
+
+
+/* popup */
+
+.leaflet-popup {
+	position: absolute;
+	text-align: center;
+	margin-bottom: 20px;
+	}
+.leaflet-popup-content-wrapper {
+	padding: 1px;
+	text-align: left;
+	border-radius: 12px;
+	}
+.leaflet-popup-content {
+	margin: 13px 24px 13px 20px;
+	line-height: 1.3;
+	font-size: 13px;
+	font-size: 1.08333em;
+	min-height: 1px;
+	}
+.leaflet-popup-content p {
+	margin: 17px 0;
+	margin: 1.3em 0;
+	}
+.leaflet-popup-tip-container {
+	width: 40px;
+	height: 20px;
+	position: absolute;
+	left: 50%;
+	margin-top: -1px;
+	margin-left: -20px;
+	overflow: hidden;
+	pointer-events: none;
+	}
+.leaflet-popup-tip {
+	width: 17px;
+	height: 17px;
+	padding: 1px;
+
+	margin: -10px auto 0;
+	pointer-events: auto;
+
+	-webkit-transform: rotate(45deg);
+	   -moz-transform: rotate(45deg);
+	    -ms-transform: rotate(45deg);
+	        transform: rotate(45deg);
+	}
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+	background: white;
+	color: #333;
+	box-shadow: 0 3px 14px rgba(0,0,0,0.4);
+	}
+.leaflet-container a.leaflet-popup-close-button {
+	position: absolute;
+	top: 0;
+	right: 0;
+	border: none;
+	text-align: center;
+	width: 24px;
+	height: 24px;
+	font: 16px/24px Tahoma, Verdana, sans-serif;
+	color: #757575;
+	text-decoration: none;
+	background: transparent;
+	}
+.leaflet-container a.leaflet-popup-close-button:hover,
+.leaflet-container a.leaflet-popup-close-button:focus {
+	color: #585858;
+	}
+.leaflet-popup-scrolled {
+	overflow: auto;
+	}
+
+.leaflet-oldie .leaflet-popup-content-wrapper {
+	-ms-zoom: 1;
+	}
+.leaflet-oldie .leaflet-popup-tip {
+	width: 24px;
+	margin: 0 auto;
+
+	-ms-filter: "progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678)";
+	filter: progid:DXImageTransform.Microsoft.Matrix(M11=0.70710678, M12=0.70710678, M21=-0.70710678, M22=0.70710678);
+	}
+
+.leaflet-oldie .leaflet-control-zoom,
+.leaflet-oldie .leaflet-control-layers,
+.leaflet-oldie .leaflet-popup-content-wrapper,
+.leaflet-oldie .leaflet-popup-tip {
+	border: 1px solid #999;
+	}
+
+
+/* div icon */
+
+.leaflet-div-icon {
+	background: #fff;
+	border: 1px solid #666;
+	}
+
+
+/* Tooltip */
+/* Base styles for the element that has a tooltip */
+.leaflet-tooltip {
+	position: absolute;
+	padding: 6px;
+	background-color: #fff;
+	border: 1px solid #fff;
+	border-radius: 3px;
+	color: #222;
+	white-space: nowrap;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	pointer-events: none;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+	}
+.leaflet-tooltip.leaflet-interactive {
+	cursor: pointer;
+	pointer-events: auto;
+	}
+.leaflet-tooltip-top:before,
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	position: absolute;
+	pointer-events: none;
+	border: 6px solid transparent;
+	background: transparent;
+	content: "";
+	}
+
+/* Directions */
+
+.leaflet-tooltip-bottom {
+	margin-top: 6px;
+}
+.leaflet-tooltip-top {
+	margin-top: -6px;
+}
+.leaflet-tooltip-bottom:before,
+.leaflet-tooltip-top:before {
+	left: 50%;
+	margin-left: -6px;
+	}
+.leaflet-tooltip-top:before {
+	bottom: 0;
+	margin-bottom: -12px;
+	border-top-color: #fff;
+	}
+.leaflet-tooltip-bottom:before {
+	top: 0;
+	margin-top: -12px;
+	margin-left: -6px;
+	border-bottom-color: #fff;
+	}
+.leaflet-tooltip-left {
+	margin-left: -6px;
+}
+.leaflet-tooltip-right {
+	margin-left: 6px;
+}
+.leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before {
+	top: 50%;
+	margin-top: -6px;
+	}
+.leaflet-tooltip-left:before {
+	right: 0;
+	margin-right: -12px;
+	border-left-color: #fff;
+	}
+.leaflet-tooltip-right:before {
+	left: 0;
+	margin-left: -12px;
+	border-right-color: #fff;
+	}
+
+/* Printing */
+
+@media print {
+	/* Prevent printers from removing background-images of controls. */
+	.leaflet-control {
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+		}
+	}
+.leaflet-cluster-anim .leaflet-marker-icon, .leaflet-cluster-anim .leaflet-marker-shadow {
+	-webkit-transition: -webkit-transform 0.3s ease-out, opacity 0.3s ease-in;
+	-moz-transition: -moz-transform 0.3s ease-out, opacity 0.3s ease-in;
+	-o-transition: -o-transform 0.3s ease-out, opacity 0.3s ease-in;
+	transition: transform 0.3s ease-out, opacity 0.3s ease-in;
+}
+
+.leaflet-cluster-spider-leg {
+	/* stroke-dashoffset (duration and function) should match with leaflet-marker-icon transform in order to track it exactly */
+	-webkit-transition: -webkit-stroke-dashoffset 0.3s ease-out, -webkit-stroke-opacity 0.3s ease-in;
+	-moz-transition: -moz-stroke-dashoffset 0.3s ease-out, -moz-stroke-opacity 0.3s ease-in;
+	-o-transition: -o-stroke-dashoffset 0.3s ease-out, -o-stroke-opacity 0.3s ease-in;
+	transition: stroke-dashoffset 0.3s ease-out, stroke-opacity 0.3s ease-in;
+}
+
+</style>
+<style>
+/* Layout idea: a one-screen map app. Map fills the stage, filters float on top as chips,
+   details rise in a bottom sheet, a five-slot tab bar anchors the thumb. */
+:root{
+  --bg:#F2F6F4; --surface:#FFFFFF; --ink:#16233B; --muted:#5A6780; --line:#D9E1E6;
+  --accent:#0F6E66; --accent-ink:#FFFFFF; --accent-soft:#DDF0EC; --sun:#FFC83D; --sun-ink:#4A3500;
+  --water:#CDE4EC; --land:#EAF4E0; --landctx:#E2E8E3; --coast:#9DB8A5; --lake:#B9D9E6;
+  --good:#2B8A3E; --warn:#B56A00; --bad:#C92A2A;
+  --display:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  --body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px; --shadow:0 6px 24px rgba(16,35,59,.16);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1722; --surface:#182233; --ink:#EAF0F7; --muted:#9BA9BE; --line:#2B384C;
+    --accent:#4FD1B8; --accent-ink:#06231E; --accent-soft:#17383A; --sun:#FFC83D; --sun-ink:#3A2900;
+    --water:#0B2230; --land:#243A30; --landctx:#1A2632; --coast:#44624F; --lake:#123447;
+    --good:#69DB7C; --warn:#FFC078; --bad:#FF8787; --shadow:0 6px 24px rgba(0,0,0,.5);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1722; --surface:#182233; --ink:#EAF0F7; --muted:#9BA9BE; --line:#2B384C;
+  --accent:#4FD1B8; --accent-ink:#06231E; --accent-soft:#17383A; --sun:#FFC83D; --sun-ink:#3A2900;
+  --water:#0B2230; --land:#243A30; --landctx:#1A2632; --coast:#44624F; --lake:#123447;
+  --good:#69DB7C; --warn:#FFC078; --bad:#FF8787; --shadow:0 6px 24px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.4;display:flex;flex-direction:column;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance}
+.tnum{font-variant-numeric:tabular-nums}
+
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);z-index:5}
+.brand{display:flex;align-items:center;gap:8px;font-family:var(--display);font-size:20px;font-weight:600;white-space:nowrap}
+.brand svg{width:26px;height:26px}
+.search{flex:1;position:relative;min-width:0}
+.search input{width:100%;height:38px;border:1px solid var(--line);border-radius:19px;background:var(--bg);padding:0 14px}
+#results{position:absolute;top:44px;left:0;right:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);max-height:50vh;overflow:auto;z-index:20}
+#results button{display:flex;gap:8px;align-items:center;width:100%;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+#results button:last-child{border-bottom:0}
+#results small{color:var(--muted)}
+.lang{height:38px;min-width:38px;border:1px solid var(--line);border-radius:19px;font-weight:700;font-size:12px}
+
+#chips{display:flex;gap:8px;padding:8px 16px;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--line);scrollbar-width:none;z-index:4}
+#chips::-webkit-scrollbar{display:none}
+.chip{flex:none;display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;border:1px solid var(--line);border-radius:17px;background:var(--surface);font-weight:600;font-size:13px;white-space:nowrap}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.chip .dot{width:10px;height:10px;border-radius:50%}
+.chips-wrap{display:flex;flex-wrap:wrap;gap:8px}
+
+main{flex:1;position:relative;min-height:0}
+.view{position:absolute;inset:0;overflow:auto;display:none}
+.view.on{display:block}
+#v-carte{overflow:hidden}
+#map{position:absolute;inset:0;background:var(--water);font-family:var(--body)}
+.leaflet-container{background:var(--water)}
+.land-main{fill:var(--land);stroke:var(--coast);stroke-width:1.2}
+.land-ctx{fill:var(--landctx);stroke:var(--coast);stroke-width:.6;stroke-opacity:.6}
+.lake{fill:var(--lake);stroke:var(--coast);stroke-width:.6}
+.city{color:var(--muted);font-size:11px;font-weight:600;white-space:nowrap;text-shadow:0 0 3px var(--land),0 0 3px var(--land);pointer-events:none}
+.city::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--muted);margin-right:4px;vertical-align:middle}
+.z-far .city.minor{display:none}
+.leaflet-control-attribution{background:transparent!important;color:var(--muted)!important;font-size:10px}
+.pin{width:34px;height:34px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pin svg{transform:rotate(45deg);width:18px;height:18px}
+.pin.todo{border-style:dashed}
+.pin.all::after{content:"";position:absolute;top:-4px;right:-4px;width:12px;height:12px;border-radius:50%;background:var(--sun);border:2px solid #fff}
+.clu{width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;border:3px solid var(--surface);box-shadow:0 2px 6px rgba(0,0,0,.3)}
+#count{position:absolute;left:16px;bottom:16px;z-index:500;background:var(--surface);border:1px solid var(--line);border-radius:17px;padding:6px 12px;font-weight:600;font-size:13px;box-shadow:var(--shadow)}
+#zoom{position:absolute;right:16px;bottom:16px;z-index:500;display:flex;flex-direction:column;gap:8px}
+.tiles .leaflet-control-attribution{background:var(--surface)!important;border-radius:8px 0 0 0;padding:1px 6px}
+.tiles .leaflet-control-attribution a{color:inherit}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tiles .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9)}}
+:root[data-theme="dark"] .tiles .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.95) contrast(.9)}
+#zoom button{width:40px;height:40px;border-radius:50%;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:20px;font-weight:700}
+#note{position:absolute;left:16px;right:16px;top:12px;z-index:500;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:8px 12px;font-size:13px;box-shadow:var(--shadow)}
+#pick{position:absolute;inset:0;z-index:600;pointer-events:none;display:none}
+#pick.on{display:block}
+#pick .cross{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-34px 0 0 -17px}
+#pick .bar{position:absolute;left:16px;right:16px;bottom:16px;display:flex;gap:8px;pointer-events:auto;background:var(--surface);border-radius:var(--r);padding:10px;box-shadow:var(--shadow);align-items:center}
+#pick .bar span{flex:1;font-size:13px}
+
+.pad{padding:16px;max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.row{display:flex;gap:12px;align-items:center}
+.row > .grow{flex:1;min-width:0}
+.spotrow{display:flex;gap:12px;align-items:center;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.spotrow h3{font-size:16px}
+.spotrow p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.ico{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center}
+.ico svg{width:20px;height:20px}
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:10px;background:var(--bg);border:1px solid var(--line)}
+.tag.good{color:var(--good);border-color:currentColor}
+.tag.warn{color:var(--warn);border-color:currentColor}
+.tag.bad{color:var(--bad);border-color:currentColor}
+.tag.sun{background:var(--sun);color:var(--sun-ink);border-color:var(--sun)}
+.muted{color:var(--muted)}
+.empty{text-align:center;color:var(--muted);padding:32px 16px}
+
+nav{display:grid;grid-template-columns:repeat(5,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 8px 8px;z-index:5}
+nav button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;color:var(--muted);padding:4px 0;border-radius:10px}
+nav button svg{width:22px;height:22px}
+nav button[aria-current="page"]{color:var(--accent)}
+nav .add span.fab{width:44px;height:44px;margin-top:-18px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;box-shadow:var(--shadow);border:3px solid var(--surface)}
+
+.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:42px;padding:0 16px;border-radius:21px;font-weight:700;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.sm{min-height:34px;padding:0 12px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:default}
+.btn.on{background:var(--sun);color:var(--sun-ink);border-color:var(--sun)}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+
+#backdrop{position:fixed;inset:0;background:rgba(10,20,35,.45);z-index:900;display:none}
+#backdrop.on{display:block}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:901;background:var(--surface);border-radius:20px 20px 0 0;box-shadow:var(--shadow);max-height:88%;overflow:auto;transform:translateY(105%);transition:transform .22s ease;padding:8px 16px 20px}
+#sheet.on{transform:none}
+@media (prefers-reduced-motion: reduce){#sheet{transition:none}}
+#sheet .inner{max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+#sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 6px}
+.sheethead{display:flex;gap:12px;align-items:flex-start}
+.sheethead h2{font-size:21px;line-height:1.2}
+.close{flex:none;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);font-size:18px}
+.trust{display:flex;gap:12px;align-items:center;background:var(--bg);border-radius:var(--r);padding:10px 12px}
+.gauge{flex:none;width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:15px;background:conic-gradient(var(--g) calc(var(--p)*1%),var(--line) 0)}
+.gauge span{width:40px;height:40px;border-radius:50%;background:var(--bg);display:grid;place-items:center}
+.bars{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:13px}
+.bars i{display:block;height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bars i b{display:block;height:100%;background:var(--sun)}
+.tip{border-left:3px solid var(--sun);padding:4px 0 4px 10px}
+.tip p{margin:0}
+.tip small{color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.facts div{background:var(--bg);border-radius:10px;padding:8px 10px;font-size:13px}
+.facts b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700}
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px}
+label.f input,label.f select,label.f textarea{border:1px solid var(--line);border-radius:10px;background:var(--bg);padding:10px;font-weight:400;font-size:15px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stars{display:flex;gap:4px}
+.stars button{font-size:30px;line-height:1;color:var(--line)}
+.stars button.on{color:var(--sun)}
+.faces{display:flex;gap:8px}
+.faces button{width:52px;height:52px;border-radius:50%;border:2px solid var(--line);font-size:26px}
+.faces button[aria-pressed="true"]{border-color:var(--sun);background:var(--sun)}
+.alert{border-radius:10px;padding:10px 12px;font-size:13px;background:var(--bg);border-left:4px solid var(--warn)}
+
+.level{display:flex;gap:14px;align-items:center}
+.medal{flex:none;width:64px;height:64px;border-radius:50%;background:var(--sun);color:var(--sun-ink);display:grid;place-items:center;font-family:var(--display);font-size:24px;font-weight:600;box-shadow:inset 0 0 0 4px rgba(255,255,255,.5)}
+.prog{height:10px;border-radius:5px;background:var(--line);overflow:hidden;margin-top:6px}
+.prog b{display:block;height:100%;background:var(--accent)}
+.stamps{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:12px}
+.stamp{aspect-ratio:1;border-radius:50%;border:3px double currentColor;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;padding:10px;font-size:10px;font-weight:700;line-height:1.15;text-transform:uppercase;letter-spacing:.03em}
+.stamp svg{width:22px;height:22px}
+.stamp:nth-child(3n+1){transform:rotate(-6deg)}
+.stamp:nth-child(3n+2){transform:rotate(4deg)}
+.stamp.blank{border:2px dashed var(--line);color:var(--muted)}
+.badges{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.badge{border:1px solid var(--line);border-radius:var(--r);padding:10px;font-size:13px;opacity:.5}
+.badge.got{opacity:1;border-color:var(--sun);background:var(--surface)}
+.badge b{display:block;font-family:var(--display);font-size:15px}
+.kid{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border-radius:17px;padding:4px 6px 4px 12px;font-weight:700}
+.kid button{width:26px;height:26px;border-radius:50%;background:var(--surface)}
+#toast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:20px;font-weight:600;font-size:13px;z-index:999;display:none;max-width:88%;text-align:center}
+#toast.on{display:block}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand" aria-label="Ribambelle">
+    <svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="6" cy="9" r="3.4" fill="#E8590C"/><circle cx="13" cy="7" r="4" fill="#0F6E66"/><circle cx="20" cy="9" r="3.4" fill="#FFC83D"/><path d="M2 21c0-4 2-6 4-6s3 1 3.5 2.5C10 15.500 11.500 14 13 14s3 1.500 3.500 3.500C17 16 18 15 20 15s4 2 4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <span>Ribambelle</span>
+  </div>
+  <div class="search">
+    <input id="q" type="search" autocomplete="off" aria-label="Recherche">
+    <div id="results" hidden></div>
+  </div>
+  <button class="lang" id="lang" type="button" aria-label="Langue">EN</button>
+</header>
+<div id="chips"></div>
+<main>
+  <section class="view on" id="v-carte">
+    <div id="map"></div>
+    <div id="note" hidden></div>
+    <div id="count" class="tnum"></div>
+    <div id="zoom"><button type="button" id="loc" aria-label="Autour de moi" hidden>◎</button><button type="button" id="zin" aria-label="Zoom +">+</button><button type="button" id="zout" aria-label="Zoom -">−</button></div>
+    <div id="pick">
+      <svg class="cross" viewBox="0 0 34 34"><path d="M17 33C9 22 5 17 5 12a12 12 0 0 1 24 0c0 5-4 10-12 21z" fill="#E8590C" stroke="#fff" stroke-width="2"/><circle cx="17" cy="12" r="4" fill="#fff"/></svg>
+      <div class="bar"><span id="pickmsg"></span><button class="btn ghost sm" type="button" id="pickno"></button><button class="btn sm" type="button" id="pickok"></button></div>
+    </div>
+  </section>
+  <section class="view" id="v-liste"></section>
+  <section class="view" id="v-passeport"></section>
+  <section class="view" id="v-famille"></section>
+</main>
+<nav id="nav"></nav>
+<div id="backdrop"></div>
+<div id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="inner" id="sheetin"></div></div>
+<div id="toast" role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
+<script>
+/* Local data layer: seed spots come from spots.json, everything a family adds stays on this device.
+   It exposes the same small interface a shared backend would, so a server can replace it later. */
+(()=>{
+  const KEY="ribambelle-db";let store={};
+  try{store=JSON.parse(localStorage.getItem(KEY)||"{}")||{};}catch(e){}
+  let uid=null;try{uid=localStorage.getItem("ribambelle-uid");}catch(e){}
+  if(!uid){uid="f"+Math.random().toString(36).slice(2,10);try{localStorage.setItem("ribambelle-uid",uid);}catch(e){}}
+  const subs=[],meta={fromCache:false,hasPendingWrites:false};let seeds=null;
+  const snap=p=>({id:p.split("/").pop(),exists:p in store,data:()=>store[p],metadata:meta});
+  const col=c=>{const depth=c.split("/").length+1;
+    const docs=c==="spots"?seeds.map(s=>({id:s.id,exists:true,data:()=>s,metadata:meta})):Object.keys(store).filter(k=>k.startsWith(c+"/")&&k.split("/").length===depth).sort().map(snap);
+    return {docs,size:docs.length,empty:!docs.length,docChanges:()=>[],metadata:meta};};
+  const fire=()=>subs.forEach(f=>f());
+  const db={
+    doc:p=>({id:p.split("/").pop(),path:p,get:async()=>snap(p),
+      set:async d=>{store[p]=JSON.parse(JSON.stringify(d));try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}setTimeout(fire,0);},
+      onSnapshot:n=>{const f=()=>n(snap(p));subs.push(f);setTimeout(f,0);return()=>{};}}),
+    collection:c=>({path:c,onSnapshot:n=>{const f=()=>{if(c==="spots"&&!seeds)return;n(col(c));};subs.push(f);setTimeout(f,0);return()=>{};}})
+  };
+  fetch("spots.json").then(r=>r.json()).then(j=>{seeds=Array.isArray(j)?j:[];fire();}).catch(()=>{seeds=[];fire();});
+  window.claude={use:async n=>n==="db"?db:n==="user"?{id:async()=>uid,canEdit:async()=>false,can:async()=>true}:null};
+})();
+</script>
+<script>
+const GEO=/*GEO*/null;
+const HOSTED=true;
+const LAKES=[
+ [[6.15,46.21],[6.24,46.38],[6.34,46.46],[6.5,46.51],[6.63,46.505],[6.84,46.46],[6.91,46.43],[6.93,46.4],[6.85,46.39],[6.8,46.39],[6.59,46.4],[6.48,46.375],[6.33,46.37],[6.24,46.3],[6.16,46.2]],
+ [[6.64,46.78],[6.75,46.87],[6.93,46.99],[7.05,47.01],[7.03,46.96],[6.86,46.86],[6.68,46.78]],
+ [[9.02,47.81],[9.17,47.75],[9.48,47.65],[9.73,47.54],[9.6,47.5],[9.38,47.55],[9.18,47.66],[9.1,47.72]],
+ [[8.54,47.36],[8.6,47.3],[8.72,47.24],[8.82,47.22],[8.95,47.21],[8.82,47.2],[8.68,47.22],[8.56,47.3]]
+];
+const CITIES=[["Genève",46.204,6.143,1],["Nyon",46.383,6.24,0],["Lausanne",46.52,6.633,1],["Montreux",46.431,6.911,0],["Sion",46.233,7.36,0],["Martigny",46.1,7.07,0],["Fribourg",46.806,7.162,0],["Neuchâtel",46.99,6.93,0],["Berne",46.948,7.447,1],["Bâle",47.56,7.59,1],["Zurich",47.377,8.54,1],["Lucerne",47.05,8.31,0],["Interlaken",46.686,7.863,0],["Lugano",46.004,8.951,0],["Saint-Gall",47.424,9.377,0],["Coire",46.85,9.53,0],["Paris",48.857,2.352,1],["Lyon",45.764,4.836,1],["Annecy",45.9,6.129,0],["Chamonix",45.924,6.87,0],["Grenoble",45.188,5.724,0],["Marseille",43.296,5.37,1],["Nice",43.71,7.262,1],["Montpellier",43.611,3.877,0],["Toulouse",43.604,1.444,1],["Bordeaux",44.838,-0.579,1],["La Rochelle",46.16,-1.151,0],["Nantes",47.218,-1.554,1],["Rennes",48.117,-1.678,0],["Brest",48.39,-4.486,0],["Saint-Malo",48.649,-2.026,0],["Lille",50.629,3.057,1],["Strasbourg",48.573,7.752,1],["Mulhouse",47.75,7.336,0],["Besançon",47.238,6.024,0],["Dijon",47.322,5.041,0],["Clermont-Ferrand",45.777,3.087,0],["Tours",47.394,0.685,0],["Poitiers",46.58,0.34,0],["Avignon",43.949,4.806,0]];
+const CATS={
+ jeux:{c:"#E8590C",i:'<path d="M4 5h16M8 5v9M16 5v9M7 14h10" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M4 5l-1 15M20 5l1 15" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'},
+ nature:{c:"#2F9E44",i:'<path d="M12 3l6 8h-3l4 6H5l4-6H6z" fill="#fff"/><path d="M12 17v4" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'},
+ baignade:{c:"#1C7ED6",i:'<path d="M3 9c2-2 4-2 6 0s4 2 6 0 4-2 6 0M3 15c2-2 4-2 6 0s4 2 6 0 4-2 6 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'},
+ animaux:{c:"#A0612B",i:'<circle cx="7" cy="9" r="2" fill="#fff"/><circle cx="12" cy="6.500" r="2" fill="#fff"/><circle cx="17" cy="9" r="2" fill="#fff"/><path d="M12 11c-3 0-5 3-5 5.500S9 19 12 19s5 0 5-2.500S15 11 12 11z" fill="#fff"/>'},
+ musee:{c:"#7048E8",i:'<path d="M4 9l8-5 8 5M6 10v7M10 10v7M14 10v7M18 10v7M4 20h16" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'},
+ sport:{c:"#D6336C",i:'<path d="M3 19l6-11 4 6 2-3 6 8z" fill="#fff"/>'},
+ indoor:{c:"#0C8599",i:'<path d="M4 11l8-7 8 7M6 10v10h12V10" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'},
+ neige:{c:"#64748B",i:'<path d="M12 3v18M4.200 7.500l15.600 9M19.800 7.500l-15.600 9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>'}
+};
+const BANDS=[[0,2],[3,5],[6,8],[9,12],[13,16]];
+const TAGS=["po","wc","la","om","re","pk","pi"];
+const FACES=["😍","🙂","😐","😴"];
+const I18N={fr:{
+ search:"Ville ou spot",carte:"Carte",liste:"Liste",ajouter:"Ajouter",passeport:"Passeport",famille:"Famille",
+ c_jeux:"Aire de jeux",c_nature:"Nature et balade",c_baignade:"Baignade",c_animaux:"Animaux",c_musee:"Musée et découverte",c_sport:"Sport et aventure",c_indoor:"Indoor",c_neige:"Neige",
+ t_po:"Poussette",t_wc:"Toilettes",t_la:"Table à langer",t_om:"Ombre",t_re:"Restauration",t_pk:"Parking",t_pi:"Pique-nique",
+ fam:"Ma famille",ages:"Âges",an:"ans",free:"Gratuit",paid:"Payant",rain:"Jour de pluie",filters:"Filtres",now:"De saison",favs:"Favoris",
+ nspots:n=>n+(n>1?" spots":" spot"),all:"Pour toute la famille",ideal:"Idéal",from:"Dès",
+ d1:"Environ 1 h",d2:"Demi-journée",d3:"Journée",in:"Intérieur",out:"Extérieur",both:"Intérieur et extérieur",
+ s_ok:"Vérifié",s_todo:"À confirmer",s_bad:"Signalé",trust:"Indice de confiance",
+ never:"Pas encore vérifié par une famille",last:d=>"Dernière vérification "+d,conf:n=>n+(n>1?" familles ont confirmé":" famille a confirmé"),
+ seedinfo:"Fiche de départ. Position et infos pratiques à confirmer sur place.",
+ go:"Itinéraire",fav:"Favori",been:"On y est allés",stamped:"Tamponné",still:"Toujours valable",confirmed:"Confirmé",rate:"Donner un avis",report:"Signaler",
+ practical:"Infos pratiques",age:"Âge",duration:"Durée",setting:"Cadre",price:"Prix",season:"Saison",allyear:"Toute l'année",
+ se_p:"printemps",se_e:"été",se_a:"automne",se_h:"hiver",
+ notes:"Notes des familles",byage:"Par tranche d'âge",noreview:"Aucun avis pour l'instant. Soyez la première famille à noter ce spot.",
+ kidsvote:"L'avis des enfants",tips:"Conseils de parents",withkids:a=>"avec enfants de "+a+" ans",
+ yourrate:"Votre note",kidrate:"Et les enfants, ils en ont pensé quoi ?",tip:"Un conseil pour les autres familles",tipph:"Ex. arriver avant 10 h, prévoir des bottes",
+ agesvisit:"Âge de vos enfants ce jour-là",send:"Publier",cancel:"Annuler",save:"Enregistrer",thanks:"Merci, c'est publié",needstar:"Choisissez une note",
+ r_closed:"Fermé définitivement",r_danger:"Dangereux",r_wrong:"Infos fausses",reported:"Signalement envoyé",reports:n=>n+(n>1?" signalements":" signalement"),
+ hide:"Masquer ce spot",unhide:"Réafficher ce spot",hidden:"Spot masqué par la modération",
+ newspot:"Nouveau spot",name:"Nom du spot",cat:"Catégorie",amin:"Âge mini",amax:"Âge maxi",summary:"En deux lignes, pourquoi y aller ?",
+ pos:"Position",place:"Placer sur la carte",placed:"Position choisie",pickmsg:"Déplacez la carte pour placer le repère",ok:"Valider",
+ dup:"Un spot proche existe déjà :",dupgo:"Voir ce spot",needname:"Donnez un nom au spot",needpos:"Placez le spot sur la carte",added:"Spot ajouté. Il sera vérifié après 2 confirmations.",
+ amen:"Sur place",
+ lvl:["Curieux","Explorateur","Éclaireur","Guide"],points:"points",next:n=>"Encore "+n+" points avant le niveau suivant",top:"Niveau maximum atteint",
+ stamps:"Mes tampons",nostamp:"Votre passeport est vide. Tamponnez un spot depuis sa fiche avec « On y est allés ».",
+ challenge:"Défi de saison",ch_h:"3 sorties à l'abri cet hiver",ch_p:"3 balades nature ce printemps",ch_e:"3 baignades cet été",ch_a:"3 musées et découvertes cet automne",
+ badges:"Badges",b1:"Premier tampon",b1d:"Visiter un spot",b2:"Tour d'horizon",b2d:"4 catégories différentes",b3:"Voix des familles",b3d:"Publier 3 avis",b4:"Défricheur",b4d:"Ajouter un spot",b5:"Sentinelle",b5d:"Confirmer 5 spots",b6:"Deux pays",b6d:"Un tampon en Suisse et en France",
+ kids:"Mes enfants",kidshelp:"Seule l'année de naissance est enregistrée. Elle reste privée et sert à filtrer la carte.",addkid:"Ajouter un enfant",year:"Année de naissance",nokid:"Ajoutez vos enfants pour que la carte se filtre toute seule.",
+ home:"Ma base",homehelp:"Point de départ de la carte et des distances.",none:"Aucune",
+ mod:"Modération",modnone:"Aucun signalement en cours.",
+ nodata:"Les données partagées ne répondent pas encore. Vérifiez votre connexion.",offline:"Données partagées indisponibles dans cette vue. La contribution est désactivée.",
+ readonly:"Votre accès est en lecture seule. Demandez un accès Contributeur pour participer.",
+ emptydb:"Aucun spot pour l'instant. Ajoutez le premier.",nomatch:"Aucun spot ne correspond à ces filtres.",reset:"Réinitialiser les filtres",
+ km:"km",mine:"Ajouté par vous",del:"Supprimer mon spot",ago_d:"aujourd'hui",ago_m:n=>"il y a "+n+" mois",ago_j:n=>"il y a "+n+" j",
+ mapnote:"Fond de carte simplifié. Utilisez Itinéraire pour la carte détaillée.",localnote:"Vos spots, avis et tampons sont enregistrés sur cet appareil. Le partage entre familles demande un serveur, à brancher ensuite.",locerr:"Position indisponible. Autorisez la localisation pour ce site.",close:"Fermer"
+},en:{
+ search:"City or spot",carte:"Map",liste:"List",ajouter:"Add",passeport:"Passport",famille:"Family",
+ c_jeux:"Playground",c_nature:"Nature and walks",c_baignade:"Swimming",c_animaux:"Animals",c_musee:"Museum and discovery",c_sport:"Sport and adventure",c_indoor:"Indoor",c_neige:"Snow",
+ t_po:"Stroller",t_wc:"Toilets",t_la:"Changing table",t_om:"Shade",t_re:"Food",t_pk:"Parking",t_pi:"Picnic",
+ fam:"My family",ages:"Ages",an:"yrs",free:"Free",paid:"Paid",rain:"Rainy day",filters:"Filters",now:"In season",favs:"Favourites",
+ nspots:n=>n+(n===1?" spot":" spots"),all:"For the whole family",ideal:"Best at",from:"From",
+ d1:"About 1 h",d2:"Half day",d3:"Full day",in:"Indoor",out:"Outdoor",both:"Indoor and outdoor",
+ s_ok:"Verified",s_todo:"To confirm",s_bad:"Reported",trust:"Trust score",
+ never:"Not yet verified by a family",last:d=>"Last verified "+d,conf:n=>n+(n===1?" family confirmed":" families confirmed"),
+ seedinfo:"Starter entry. Location and practical details to confirm on site.",
+ go:"Directions",fav:"Favourite",been:"We went",stamped:"Stamped",still:"Still valid",confirmed:"Confirmed",rate:"Leave a review",report:"Report",
+ practical:"Practical info",age:"Age",duration:"Duration",setting:"Setting",price:"Price",season:"Season",allyear:"All year",
+ se_p:"spring",se_e:"summer",se_a:"autumn",se_h:"winter",
+ notes:"Family ratings",byage:"By age group",noreview:"No reviews yet. Be the first family to rate this spot.",
+ kidsvote:"What the kids thought",tips:"Tips from parents",withkids:a=>"with kids aged "+a,
+ yourrate:"Your rating",kidrate:"And what did the kids think?",tip:"A tip for other families",tipph:"E.g. arrive before 10, bring boots",
+ agesvisit:"Your kids' ages that day",send:"Publish",cancel:"Cancel",save:"Save",thanks:"Thanks, it's published",needstar:"Pick a rating",
+ r_closed:"Permanently closed",r_danger:"Dangerous",r_wrong:"Wrong information",reported:"Report sent",reports:n=>n+(n===1?" report":" reports"),
+ hide:"Hide this spot",unhide:"Show this spot again",hidden:"Spot hidden by moderation",
+ newspot:"New spot",name:"Spot name",cat:"Category",amin:"Min age",amax:"Max age",summary:"In two lines, why go?",
+ pos:"Location",place:"Place on the map",placed:"Location set",pickmsg:"Move the map to place the marker",ok:"Confirm",
+ dup:"A nearby spot already exists:",dupgo:"See that spot",needname:"Give the spot a name",needpos:"Place the spot on the map",added:"Spot added. It becomes verified after 2 confirmations.",
+ amen:"On site",
+ lvl:["Curious","Explorer","Scout","Guide"],points:"points",next:n=>n+" points to the next level",top:"Top level reached",
+ stamps:"My stamps",nostamp:"Your passport is empty. Stamp a spot from its page with \"We went\".",
+ challenge:"Seasonal challenge",ch_h:"3 indoor outings this winter",ch_p:"3 nature walks this spring",ch_e:"3 swims this summer",ch_a:"3 museums and discoveries this autumn",
+ badges:"Badges",b1:"First stamp",b1d:"Visit one spot",b2:"All-rounder",b2d:"4 different categories",b3:"Family voice",b3d:"Publish 3 reviews",b4:"Trailblazer",b4d:"Add a spot",b5:"Lookout",b5d:"Confirm 5 spots",b6:"Two countries",b6d:"A stamp in Switzerland and in France",
+ kids:"My children",kidshelp:"Only the birth year is stored. It stays private and is used to filter the map.",addkid:"Add a child",year:"Birth year",nokid:"Add your children and the map filters itself.",
+ home:"Home base",homehelp:"Starting point for the map and distances.",none:"None",
+ mod:"Moderation",modnone:"No open reports.",
+ nodata:"Shared data is not answering yet. Check your connection.",offline:"Shared data is unavailable in this view. Contributing is turned off.",
+ readonly:"Your access is read-only. Ask for Contributor access to take part.",
+ emptydb:"No spots yet. Add the first one.",nomatch:"No spot matches these filters.",reset:"Reset filters",
+ km:"km",mine:"Added by you",del:"Delete my spot",ago_d:"today",ago_m:n=>n+" mo ago",ago_j:n=>n+" d ago",
+ mapnote:"Simplified base map. Use Directions for the detailed map.",localnote:"Your spots, reviews and stamps are saved on this device. Sharing between families needs a server, to be connected next.",locerr:"Location unavailable. Allow location access for this site.",close:"Close"
+}};
+
+/* ---------- pure logic ---------- */
+const NOW=new Date(), YEAR=NOW.getFullYear();
+const seasonOf=d=>{const m=d.getMonth();return m<2||m===11?"h":m<5?"p":m<8?"e":"a";};
+const SEASON=seasonOf(NOW);
+const kidAges=kids=>kids.map(y=>Math.max(0,YEAR-y));
+const bandOf=a=>{const i=BANDS.findIndex(b=>a>=b[0]&&a<=b[1]);return i<0?(a>16?4:0):i;};
+const fitsAge=(s,a)=>a>=s.a0&&a<=s.a1;
+const fitsBand=(s,i)=>s.a0<=BANDS[i][1]&&s.a1>=BANDS[i][0];
+function km(a,b,c,d){const R=6371,r=Math.PI/180,x=(d-b)*r*Math.cos((a+c)*r/2),y=(c-a)*r;return R*Math.sqrt(x*x+y*y);}
+function trustOf(st,now){
+  const fresh=st.last?(now-st.last)/864e5:1e9;
+  const score=Math.max(0,Math.min(100,20+Math.min(st.confirmers,4)*15+(fresh<183?20:fresh<365?10:0)-st.reports*20));
+  const status=st.reports>=2?"bad":st.confirmers>=2?"ok":"todo";
+  return {score,status};
+}
+function levelOf(p){const T=[0,50,150,300];let i=0;while(i<3&&p>=T[i+1])i++;return {i,next:i<3?T[i+1]-p:0,pct:i<3?Math.round(100*(p-T[i])/(T[i+1]-T[i])):100};}
+
+/* ---------- state ---------- */
+const S={lang:"fr",view:"carte",kids:[],useFam:true,bands:new Set(),cats:new Set(),free:false,rain:false,now:false,favOnly:false,io:"",dur:0,tags:new Set(),favs:{},visited:{},home:"",
+  seeds:new Map(),contribs:new Map(),mod:{hidden:{}},my:{spots:{},rev:{},conf:{},rep:{}},uid:null,canWrite:false,canEdit:false,db:null,ready:false,loaded:false,picked:null,draft:null};
+const t=(k,...a)=>{const v=(I18N[S.lang][k]??I18N.fr[k]??k);return typeof v==="function"?v(...a):v;};
+function el(tag,attrs,...kids){const e=document.createElement(tag);for(const k in attrs||{}){const v=attrs[k];if(v==null||v===false)continue;if(k==="class")e.className=v;else if(k==="text")e.textContent=v;else if(k==="html")e.innerHTML=v;else if(k.startsWith("on"))e.addEventListener(k.slice(2),v);else if(k==="style")e.style.cssText=v;else e.setAttribute(k,v===true?"":v);}
+  for(const c of kids.flat()){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(String(c)));}return e;}
+const $=id=>document.getElementById(id);
+const svg=(c,cls)=>'<svg viewBox="0 0 24 24" aria-hidden="true">'+CATS[c].i+'</svg>';
+const cat=s=>CATS[s.c]?s.c:"nature";
+function toast(m){const e=$("toast");e.textContent=m;e.classList.add("on");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("on"),2600);}
+function ago(ts){const d=Math.floor((Date.now()-ts)/864e5);return d<1?t("ago_d"):d<60?t("ago_j",d):t("ago_m",Math.floor(d/30));}
+
+/* ---------- data ---------- */
+function clean(d,id,owner){ // shared data is untrusted: coerce every field
+  const n=v=>Number.isFinite(+v)?+v:0, str=(v,m)=>String(v??"").slice(0,m);
+  return {id,owner:owner||null,n:str(d.n,80),la:n(d.la),lo:n(d.lo),c:str(d.c,12),co:str(d.co,2),r:str(d.r,40),a0:Math.max(0,Math.min(16,n(d.a0))),a1:Math.max(0,Math.min(99,n(d.a1)||16)),ai:str(d.ai,8),
+    fr:!!d.fr,io:["in","out","both"].includes(d.io)?d.io:"out",d:[1,2,3].includes(+d.d)?+d.d:2,tg:Array.isArray(d.tg)?d.tg.filter(x=>TAGS.includes(x)):[],se:str(d.se,4).replace(/[^peah]/g,""),s:str(d.s,300),ts:n(d.ts)};
+}
+function allSpots(){
+  const out=[...S.seeds.values()];
+  for(const [uid,c] of S.contribs){const sp=c.spots||{};for(const id in sp){const s=clean(sp[id],id,uid);if(s.n&&s.la&&s.lo)out.push(s);}}
+  return out;
+}
+function statsOf(s){
+  let confirmers=0,reports=0,last=0,sum=0,cnt=0;const revs=[],bySum=[0,0,0,0,0],byCnt=[0,0,0,0,0],faces=[0,0,0,0];
+  for(const [uid,c] of S.contribs){
+    const r=c.rev&&c.rev[s.id],cf=c.conf&&c.conf[s.id],rp=c.rep&&c.rep[s.id];let seen=0;
+    if(r&&+r.st>=1&&+r.st<=5){const st=Math.round(+r.st);sum+=st;cnt++;seen=+r.ts||0;const ages=Array.isArray(r.ages)?r.ages.filter(i=>i>=0&&i<5):[];
+      ages.forEach(i=>{bySum[i]+=st;byCnt[i]++;});if(r.kid>=0&&r.kid<4&&r.kid!==null)faces[r.kid]++;
+      revs.push({st,tip:String(r.tip||"").slice(0,280),ages,ts:+r.ts||0,mine:uid===S.uid});}
+    if(cf)seen=Math.max(seen,+cf||0);
+    if(seen&&uid!==s.owner){confirmers++;last=Math.max(last,seen);}
+    if(rp)reports++;
+  }
+  revs.sort((a,b)=>b.ts-a.ts);
+  return {confirmers,reports,last,avg:cnt?sum/cnt:0,cnt,revs,by:bySum.map((v,i)=>byCnt[i]?v/byCnt[i]:0),faces};
+}
+function matches(s){
+  if(S.mod.hidden[s.id]&&!S.canEdit)return false;
+  const ages=kidAges(S.kids);
+  if(S.useFam&&ages.length){if(!ages.some(a=>fitsAge(s,a)))return false;}
+  else if(S.bands.size&&![...S.bands].some(i=>fitsBand(s,i)))return false;
+  if(S.cats.size&&!S.cats.has(cat(s)))return false;
+  if(S.free&&!s.fr)return false;
+  if(S.rain&&s.io==="out")return false;
+  if(S.now&&s.se&&!s.se.includes(SEASON))return false;
+  if(S.io&&s.io!==S.io&&s.io!=="both")return false;
+  if(S.dur&&s.d!==S.dur)return false;
+  for(const g of S.tags)if(!s.tg.includes(g))return false;
+  if(S.favOnly&&!S.favs[s.id])return false;
+  return true;
+}
+const forAll=s=>{const a=kidAges(S.kids);return a.length>1&&a.every(x=>fitsAge(s,x));};
+const nFilters=()=>S.cats.size+S.tags.size+(S.io?1:0)+(S.dur?1:0)+(S.now?1:0)+(S.favOnly?1:0);
+
+/* ---------- persistence ---------- */
+function loadLocal(){try{const d=JSON.parse(localStorage.getItem("ribambelle")||"{}");applyState(d);}catch(e){}}
+function applyState(d){if(!d)return;if(Array.isArray(d.kids))S.kids=d.kids.filter(y=>y>YEAR-18&&y<=YEAR).slice(0,8);if(d.favs)S.favs=d.favs;if(d.visited)S.visited=d.visited;if(typeof d.home==="string")S.home=d.home;if(d.lang==="en"||d.lang==="fr")S.lang=d.lang;}
+let stateChain=Promise.resolve(),stateTimer=0;
+function saveState(){
+  const d={kids:S.kids,favs:S.favs,visited:S.visited,home:S.home,lang:S.lang};
+  try{localStorage.setItem("ribambelle",JSON.stringify(d));}catch(e){}
+  if(!S.db||!S.uid)return;
+  clearTimeout(stateTimer);stateTimer=setTimeout(()=>{stateChain=stateChain.then(()=>S.db.doc("data/users/"+S.uid+"/state").set(d)).catch(()=>{});},600);
+}
+let myChain=Promise.resolve();
+function saveMine(){
+  if(!S.db||!S.uid||!S.ready)return Promise.reject();
+  const body=JSON.parse(JSON.stringify(S.my));
+  S.contribs.set(S.uid,body);refresh();
+  myChain=myChain.then(()=>S.db.doc("contribs/"+S.uid).set(body));
+  return myChain.catch(e=>{if(e&&e.code==="invalid_argument"){S.canWrite=false;toast(t("readonly"));}else toast(t("nodata"));throw e;});
+}
+const canContribute=()=>!!(S.db&&S.uid&&S.ready&&S.canWrite);
+function guard(){if(canContribute())return true;toast(S.db?t("readonly"):t("offline"));return false;}
+
+async function connect(){
+  const timer=setTimeout(()=>{if(!S.loaded)showNote(t("nodata"));},10000);
+  let db=null,user=null;
+  try{[db,user]=await Promise.all([window.claude?window.claude.use("db"):null,window.claude?window.claude.use("user"):null]);}catch(e){}
+  if(!db){clearTimeout(timer);S.loaded=true;showNote(t("offline"));refresh();return;}
+  S.db=db;
+  try{S.uid=user?await user.id():null;S.canEdit=user?!!(await user.canEdit()):false;const w=user?await user.can("data.write"):null;S.canWrite=w!==false&&!!S.uid;}catch(e){}
+  const fail=()=>{clearTimeout(timer);showNote(t("nodata"));};
+  db.collection("spots").onSnapshot(q=>{S.seeds=new Map(q.docs.map(d=>[d.id,clean(d.data()||{},d.id,null)]));if(!q.metadata.fromCache||q.size){clearTimeout(timer);S.loaded=true;hideNote();}refresh();},fail);
+  db.collection("contribs").onSnapshot(q=>{const m=new Map();q.docs.forEach(d=>m.set(d.id,d.data()||{}));
+    if(S.uid){const mine=m.get(S.uid);if(!S.ready&&!q.metadata.fromCache){S.ready=true;if(mine)S.my=Object.assign({spots:{},rev:{},conf:{},rep:{}},JSON.parse(JSON.stringify(mine)));}
+      if(S.ready)m.set(S.uid,S.my);}
+    S.contribs=m;refresh();},fail);
+  db.doc("mod/state").onSnapshot(d=>{const h=d.exists&&d.data().hidden;S.mod={hidden:h&&typeof h==="object"?h:{}};refresh();},()=>{});
+  if(S.uid){try{const d=await db.doc("data/users/"+S.uid+"/state").get();if(d.exists){applyState(d.data());applyLang();if(S.home)goHome();refresh();}}catch(e){}}
+}
+function showNote(m){const n=$("note");n.textContent=m;n.hidden=false;}
+function hideNote(){$("note").hidden=true;}
+
+/* ---------- map ---------- */
+let map,cluster,spotIndex=new Map();
+function initMap(){
+  map=L.map("map",Object.assign({zoomControl:false,minZoom:HOSTED?3:4,maxZoom:HOSTED?18:13,zoomSnap:.5,attributionControl:true},HOSTED?{worldCopyJump:true}:{maxBounds:[[32,-16],[59,24]],maxBoundsViscosity:.8}));
+  map.attributionControl.setPrefix(false);
+  if(HOSTED){
+    $("map").classList.add("tiles");
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);
+    if(navigator.geolocation){const b=$("loc");b.hidden=false;let me=null;b.onclick=()=>navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];
+      if(me)me.setLatLng(ll);else me=L.circleMarker(ll,{radius:8,color:"#fff",weight:3,fillColor:"#1C7ED6",fillOpacity:1,interactive:false}).addTo(map);map.setView(ll,12);},()=>toast(t("locerr")),{enableHighAccuracy:true,timeout:10000});}
+  }else map.attributionControl.addAttribution("Natural Earth");
+  const fc=(polys,cls)=>L.geoJSON({type:"MultiPolygon",coordinates:polys},{interactive:false,style:{className:cls}}).addTo(map);
+  if(GEO){fc(GEO.ctx,"land-ctx");fc(GEO.main,"land-main");}
+  if(!HOSTED)fc(LAKES.map(l=>[l.concat([l[0]])]),"lake");
+  if(!HOSTED)CITIES.forEach(c=>L.marker([c[1],c[2]],{interactive:false,keyboard:false,icon:L.divIcon({className:"city"+(c[3]?"":" minor"),html:c[0],iconSize:[0,0]})}).addTo(map));
+  cluster=L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:46,spiderfyOnMaxZoom:true,iconCreateFunction:c=>L.divIcon({className:"",html:'<div class="clu tnum">'+c.getChildCount()+"</div>",iconSize:[40,40]})}).addTo(map);
+  const z=()=>$("map").classList.toggle("z-far",map.getZoom()<7);
+  map.on("zoomend",z);map.on("moveend",()=>{if(S.view==="liste")renderList();});
+  map.fitBounds([[43.2,-1.5],[49.5,9.5]]);z();
+  $("zin").onclick=()=>map.zoomIn();$("zout").onclick=()=>map.zoomOut();
+}
+function goHome(){const c=CITIES.find(c=>c[0]===S.home);if(c&&map)map.setView([c[1],c[2]],9);}
+function renderMarkers(list){
+  cluster.clearLayers();
+  const ms=list.map(s=>{const st=statsOf(s),tr=trustOf(st,Date.now()),c=cat(s);
+    const m=L.marker([s.la,s.lo],{title:s.n,icon:L.divIcon({className:"",iconSize:[34,34],iconAnchor:[17,34],html:'<div class="pin'+(tr.status==="ok"?"":" todo")+(forAll(s)?" all":"")+'" style="background:'+CATS[c].c+'">'+svg(c)+"</div>"})});
+    m.on("click",()=>openSpot(s.id));return m;});
+  cluster.addLayers(ms);
+}
+
+/* ---------- rendering ---------- */
+let refreshQueued=false;
+function refresh(){if(refreshQueued)return;refreshQueued=true;requestAnimationFrame(()=>{refreshQueued=false;renderAll();});}
+function visible(){const a=allSpots();spotIndex=new Map(a.map(s=>[s.id,s]));return a.filter(matches);}
+function renderAll(){
+  const list=visible();
+  renderChips();renderMarkers(list);
+  $("count").textContent=!S.loaded?"…":t("nspots",list.length);
+  if(S.view==="liste")renderList(list);
+  if(S.view==="passeport")renderPass();
+  if(S.view==="famille")renderFam();
+  if(openId&&spotIndex.has(openId)&&sheetKind==="spot")openSpot(openId,true);
+}
+function chip(label,on,fn,extra){return el("button",{class:"chip",type:"button","aria-pressed":on?"true":"false",onclick:fn},extra,label);}
+function renderChips(){
+  const c=$("chips");c.replaceChildren();
+  const ages=kidAges(S.kids);
+  if(ages.length)c.append(chip(t("fam")+" · "+ages.join(", ")+" "+t("an"),S.useFam,()=>{S.useFam=!S.useFam;refresh();}));
+  else c.append(chip(t("fam")+" +",false,()=>go("famille")));
+  if(!ages.length||!S.useFam)BANDS.forEach((b,i)=>c.append(chip(b[0]+"-"+b[1]+" "+t("an"),S.bands.has(i),()=>{S.bands.has(i)?S.bands.delete(i):S.bands.add(i);refresh();})));
+  c.append(chip(t("free"),S.free,()=>{S.free=!S.free;refresh();}),chip(t("rain"),S.rain,()=>{S.rain=!S.rain;refresh();}),
+    chip(t("t_po"),S.tags.has("po"),()=>{S.tags.has("po")?S.tags.delete("po"):S.tags.add("po");refresh();}),
+    chip(t("filters")+(nFilters()?" · "+nFilters():""),nFilters()>0,openFilters));
+}
+function spotRow(s,dist){
+  const st=statsOf(s),tr=trustOf(st,Date.now()),c=cat(s);
+  return el("button",{class:"spotrow",type:"button",onclick:()=>openSpot(s.id)},
+    el("span",{class:"ico",style:"background:"+CATS[c].c,html:svg(c)}),
+    el("span",{class:"grow"},el("h3",{text:s.n}),el("p",{text:[t("c_"+c),s.r,dist!=null?Math.round(dist)+" "+t("km"):""].filter(Boolean).join(" · ")}),
+      el("span",{class:"meta"},el("span",{class:"tag"},s.a0+"-"+Math.min(s.a1,16)+" "+t("an")),s.fr&&el("span",{class:"tag"},t("free")),
+        forAll(s)&&el("span",{class:"tag sun"},t("all")),st.cnt>0&&el("span",{class:"tag tnum"},"★ "+st.avg.toFixed(1)),
+        el("span",{class:"tag "+(tr.status==="ok"?"good":tr.status==="bad"?"bad":"warn")},t("s_"+tr.status)))));
+}
+function renderList(list){
+  list=list||visible();const v=$("v-liste"),c=map.getCenter();
+  const rows=list.map(s=>[s,km(c.lat,c.lng,s.la,s.lo)]).sort((a,b)=>a[1]-b[1]).slice(0,80);
+  const box=el("div",{class:"pad"});
+  if(!rows.length)box.append(el("div",{class:"empty"},el("p",{text:!S.loaded?"…":spotIndex.size?t("nomatch"):t("emptydb")}),spotIndex.size>0&&el("button",{class:"btn ghost",type:"button",onclick:resetFilters},t("reset"))));
+  rows.forEach(r=>box.append(spotRow(r[0],r[1])));
+  v.replaceChildren(box);
+}
+function resetFilters(){S.bands.clear();S.cats.clear();S.tags.clear();S.free=S.rain=S.now=S.favOnly=false;S.io="";S.dur=0;S.useFam=false;refresh();}
+
+/* ---------- sheet ---------- */
+let openId=null,sheetKind="";
+function showSheet(kind,nodes,keepScroll){const sh=$("sheet"),top=sh.scrollTop;sheetKind=kind;$("sheetin").replaceChildren(...nodes);sh.classList.add("on");$("backdrop").classList.add("on");sh.scrollTop=keepScroll?top:0;}
+function closeSheet(){$("sheet").classList.remove("on");$("backdrop").classList.remove("on");openId=null;sheetKind="";}
+$("backdrop").onclick=closeSheet;
+const head=(title,sub,icon)=>el("div",{class:"sheethead"},icon,el("div",{class:"grow",style:"flex:1;min-width:0"},el("h2",{text:title}),sub&&el("div",{class:"muted",text:sub})),el("button",{class:"close",type:"button","aria-label":t("close"),onclick:closeSheet},"×"));
+
+function openSpot(id,keep){
+  const s=spotIndex.get(id);if(!s)return;openId=id;
+  const st=statsOf(s),tr=trustOf(st,Date.now()),c=cat(s),mine=S.my;
+  const col=tr.status==="ok"?"var(--good)":tr.status==="bad"?"var(--bad)":"var(--warn)";
+  const seasons=s.se?[...s.se].map(x=>t("se_"+x)).join(", "):t("allyear");
+  const nodes=[
+    head(s.n,[t("c_"+c),s.r].filter(Boolean).join(" · "),el("span",{class:"ico",style:"background:"+CATS[c].c,html:svg(c)})),
+    S.mod.hidden[s.id]&&el("div",{class:"alert",text:t("hidden")}),
+    el("div",{class:"meta"},el("span",{class:"tag"},s.a0+"-"+Math.min(s.a1,16)+" "+t("an")),s.ai&&el("span",{class:"tag"},t("ideal")+" "+s.ai+" "+t("an")),forAll(s)&&el("span",{class:"tag sun"},t("all")),s.owner===S.uid&&S.uid&&el("span",{class:"tag"},t("mine"))),
+    s.s&&el("p",{style:"margin:0",text:s.s}),
+    el("div",{class:"trust"},el("div",{class:"gauge tnum",style:"--p:"+tr.score+";--g:"+col},el("span",{text:tr.score})),
+      el("div",{class:"grow"},el("b",{style:"color:"+col,text:t("s_"+tr.status)+" · "+t("trust")}),
+        el("div",{class:"muted",style:"font-size:13px",text:st.last?t("last",ago(st.last))+" · "+t("conf",st.confirmers):t("never")}),
+        st.reports>0&&el("div",{style:"font-size:13px;color:var(--bad)",text:t("reports",st.reports)}),
+        !s.owner&&st.confirmers<2&&el("div",{class:"muted",style:"font-size:12px",text:t("seedinfo")}))),
+    el("div",{class:"actions"},
+      el("a",{class:"btn",href:"https://www.google.com/maps/dir/?api=1&destination="+s.la+","+s.lo,target:"_blank",rel:"noopener"},t("go")),
+      el("button",{class:"btn ghost"+(S.favs[id]?" on":""),type:"button",onclick:()=>{S.favs[id]?delete S.favs[id]:S.favs[id]=1;saveState();refresh();}},(S.favs[id]?"♥ ":"♡ ")+t("fav")),
+      el("button",{class:"btn ghost"+(S.visited[id]?" on":""),type:"button",onclick:()=>{if(S.visited[id])delete S.visited[id];else{S.visited[id]=Date.now();toast(t("stamped"));}saveState();refresh();}},S.visited[id]?t("stamped"):t("been"))),
+    el("div",{class:"actions"},
+      el("button",{class:"btn ghost sm"+(mine.conf[id]?" on":""),type:"button",onclick:()=>{if(!guard())return;mine.conf[id]?delete mine.conf[id]:mine.conf[id]=Date.now();saveMine().catch(()=>{});}},mine.conf[id]?"✓ "+t("confirmed"):t("still")),
+      el("button",{class:"btn ghost sm",type:"button",onclick:()=>{if(guard())openReview(s);}},(mine.rev[id]?"★ ":"☆ ")+t("rate")),
+      el("button",{class:"btn ghost sm"+(mine.rep[id]?" on":""),type:"button",onclick:()=>{if(guard())openReport(s);}},t("report"))),
+    el("h3",{text:t("practical")}),
+    el("div",{class:"facts"},el("div",{},el("b",{text:t("price")}),s.fr?t("free"):t("paid")),el("div",{},el("b",{text:t("duration")}),t("d"+s.d)),el("div",{},el("b",{text:t("setting")}),t(s.io)),el("div",{},el("b",{text:t("season")}),seasons)),
+    s.tg.length>0&&el("div",{class:"meta"},s.tg.map(g=>el("span",{class:"tag"},t("t_"+g)))),
+    el("h3",{text:t("notes")}),
+    st.cnt?el("div",{},el("div",{class:"row"},el("div",{class:"tnum",style:"font-family:var(--display);font-size:30px",text:st.avg.toFixed(1)}),el("div",{class:"muted",text:"★ · "+st.cnt})),
+      el("div",{class:"bars",style:"margin-top:8px"},BANDS.flatMap((b,i)=>st.by[i]?[el("span",{text:b[0]+"-"+b[1]+" "+t("an")}),el("i",{},el("b",{style:"width:"+st.by[i]*20+"%"})),el("span",{class:"tnum",text:st.by[i].toFixed(1)})]:[])),
+      st.faces.some(Boolean)&&el("div",{style:"margin-top:10px"},el("b",{style:"font-size:13px",text:t("kidsvote")+" "}),st.faces.map((n,i)=>n?el("span",{class:"tag",style:"margin-right:4px"},FACES[i]+" "+n):null)))
+      :el("p",{class:"muted",style:"margin:0",text:t("noreview")}),
+    st.revs.some(r=>r.tip)&&el("h3",{text:t("tips")}),
+    ...st.revs.filter(r=>r.tip).slice(0,12).map(r=>el("div",{class:"tip"},el("p",{text:r.tip}),el("small",{text:"★".repeat(r.st)+(r.ages.length?" · "+t("withkids",r.ages.map(i=>BANDS[i][0]+"-"+BANDS[i][1]).join(", ")):"")+(r.ts?" · "+ago(r.ts):"")}))),
+    (S.canEdit&&st.reports>0||S.mod.hidden[id]&&S.canEdit)&&el("button",{class:"btn ghost sm",type:"button",onclick:()=>toggleHide(id)},S.mod.hidden[id]?t("unhide"):t("hide")),
+    s.owner===S.uid&&S.uid&&el("button",{class:"btn ghost sm",type:"button",onclick:()=>{if(!guard())return;delete mine.spots[id];closeSheet();saveMine().catch(()=>{});}},t("del"))
+  ].filter(Boolean);
+  showSheet("spot",nodes,keep);
+}
+function toggleHide(id){const h=Object.assign({},S.mod.hidden);h[id]?delete h[id]:h[id]=1;S.db.doc("mod/state").set({hidden:h}).catch(()=>toast(t("readonly")));}
+function openReview(s){
+  const prev=S.my.rev[s.id]||{};let st=prev.st||0,kid=prev.kid??null;const ages=new Set(prev.ages||[...new Set(kidAges(S.kids).map(bandOf))]);
+  const stars=el("div",{class:"stars",role:"group","aria-label":t("yourrate")});
+  const paint=()=>[...stars.children].forEach((b,i)=>b.classList.toggle("on",i<st));
+  for(let i=1;i<=5;i++)stars.append(el("button",{type:"button","aria-label":i+" / 5",onclick:()=>{st=i;paint();}},"★"));paint();
+  const faces=el("div",{class:"faces"});FACES.forEach((f,i)=>faces.append(el("button",{type:"button","aria-pressed":kid===i?"true":"false",onclick:e=>{kid=kid===i?null:i;[...faces.children].forEach((b,j)=>b.setAttribute("aria-pressed",j===kid?"true":"false"));}},f)));
+  const ag=el("div",{class:"chips-wrap"});BANDS.forEach((b,i)=>ag.append(el("button",{class:"chip",type:"button","aria-pressed":ages.has(i)?"true":"false",onclick:e=>{ages.has(i)?ages.delete(i):ages.add(i);e.currentTarget.setAttribute("aria-pressed",ages.has(i)?"true":"false");}},b[0]+"-"+b[1]+" "+t("an"))));
+  const tip=el("textarea",{id:"rv-tip",rows:3,maxlength:280,placeholder:t("tipph")});tip.value=prev.tip||"";
+  showSheet("form",[head(t("rate"),s.n),el("b",{text:t("yourrate")}),stars,el("b",{text:t("kidrate")}),faces,el("b",{text:t("agesvisit")}),ag,el("label",{class:"f",for:"rv-tip"},t("tip"),tip),
+    el("div",{class:"actions"},el("button",{class:"btn",type:"button",onclick:()=>{if(!st)return toast(t("needstar"));
+      S.my.rev[s.id]={st,kid,tip:tip.value.trim(),ages:[...ages],ts:Date.now()};if(!S.visited[s.id]){S.visited[s.id]=Date.now();saveState();}
+      saveMine().then(()=>toast(t("thanks"))).catch(()=>{});openSpot(s.id);}},t("send")),el("button",{class:"btn ghost",type:"button",onclick:()=>openSpot(s.id)},t("cancel")))]);
+}
+function openReport(s){
+  const cur=S.my.rep[s.id];
+  showSheet("form",[head(t("report"),s.n),...["closed","danger","wrong"].map(k=>el("button",{class:"btn ghost"+(cur&&cur.k===k?" on":""),type:"button",onclick:()=>{
+    if(cur&&cur.k===k)delete S.my.rep[s.id];else S.my.rep[s.id]={k,ts:Date.now()};saveMine().then(()=>toast(t("reported"))).catch(()=>{});openSpot(s.id);}},t("r_"+k))),
+    el("button",{class:"btn ghost",type:"button",onclick:()=>openSpot(s.id)},t("cancel"))]);
+}
+function openFilters(){
+  const tog=(label,on,fn,dot)=>el("button",{class:"chip",type:"button","aria-pressed":on?"true":"false",onclick:()=>{fn();openFilters();refresh();}},dot&&el("span",{class:"dot",style:"background:"+dot}),label);
+  const set=(st,v)=>()=>{st.has(v)?st.delete(v):st.add(v);};
+  showSheet("filters",[head(t("filters"),t("nspots",visible().length)),
+    el("b",{text:t("cat")}),el("div",{class:"chips-wrap"},Object.keys(CATS).map(c=>tog(t("c_"+c),S.cats.has(c),set(S.cats,c),CATS[c].c))),
+    el("b",{text:t("setting")}),el("div",{class:"chips-wrap"},["in","out"].map(v=>tog(t(v),S.io===v,()=>{S.io=S.io===v?"":v;}))),
+    el("b",{text:t("duration")}),el("div",{class:"chips-wrap"},[1,2,3].map(v=>tog(t("d"+v),S.dur===v,()=>{S.dur=S.dur===v?0:v;}))),
+    el("b",{text:t("amen")}),el("div",{class:"chips-wrap"},TAGS.map(g=>tog(t("t_"+g),S.tags.has(g),set(S.tags,g)))),
+    el("div",{class:"chips-wrap"},tog(t("now")+" ("+t("se_"+SEASON)+")",S.now,()=>{S.now=!S.now;}),tog("♥ "+t("favs"),S.favOnly,()=>{S.favOnly=!S.favOnly;})),
+    el("div",{class:"actions"},el("button",{class:"btn",type:"button",onclick:closeSheet},t("ok")),el("button",{class:"btn ghost",type:"button",onclick:()=>{resetFilters();closeSheet();}},t("reset")))],true);
+}
+
+/* ---------- add a spot ---------- */
+function startAdd(){if(!guard())return;S.draft=S.draft||{n:"",c:"jeux",a0:0,a1:12,fr:true,io:"out",d:2,tg:[],s:"",pos:null};openAdd();}
+function openAdd(){
+  const d=S.draft;
+  const inp=(id,type,val,extra)=>{const i=el(type==="textarea"?"textarea":"input",Object.assign({id},type==="textarea"?{rows:2,maxlength:300}:{type},extra||{}));i.value=val;return i;};
+  const name=inp("ad-n","text",d.n,{maxlength:80}),sum=inp("ad-s","textarea",d.s);
+  const sel=(id,opts,val)=>{const s=el("select",{id},opts.map(o=>el("option",{value:o[0]},o[1])));s.value=String(val);return s;};
+  const c=sel("ad-c",Object.keys(CATS).map(k=>[k,t("c_"+k)]),d.c),a0=sel("ad-a0",[...Array(17).keys()].map(i=>[i,i+" "+t("an")]),d.a0),a1=sel("ad-a1",[...Array(17).keys()].map(i=>[i,i+" "+t("an")]),d.a1),
+    io=sel("ad-io",["out","in","both"].map(k=>[k,t(k)]),d.io),du=sel("ad-d",[1,2,3].map(k=>[k,t("d"+k)]),d.d),fr=sel("ad-fr",[["1",t("free")],["0",t("paid")]],d.fr?"1":"0");
+  const sync=()=>{d.n=name.value;d.s=sum.value;d.c=c.value;d.a0=+a0.value;d.a1=Math.max(+a0.value,+a1.value);d.io=io.value;d.d=+du.value;d.fr=fr.value==="1";};
+  const tags=el("div",{class:"chips-wrap"},TAGS.map(g=>el("button",{class:"chip",type:"button","aria-pressed":d.tg.includes(g)?"true":"false",onclick:e=>{d.tg=d.tg.includes(g)?d.tg.filter(x=>x!==g):d.tg.concat(g);e.currentTarget.setAttribute("aria-pressed",d.tg.includes(g)?"true":"false");}},t("t_"+g))));
+  let dup=null;if(d.pos){const nm=d.n.trim().toLowerCase();dup=[...spotIndex.values()].find(s=>{const k=km(d.pos[0],d.pos[1],s.la,s.lo);return k<0.3||(nm.length>3&&k<3&&s.n.toLowerCase().includes(nm));});}
+  showSheet("form",[head(t("newspot")),
+    el("label",{class:"f",for:"ad-n"},t("name"),name),
+    el("div",{class:"row"},el("div",{class:"grow"},el("b",{text:t("pos")}),el("div",{class:"muted",style:"font-size:13px",text:d.pos?t("placed")+" · "+d.pos[0].toFixed(4)+", "+d.pos[1].toFixed(4):t("needpos")})),
+      el("button",{class:"btn ghost sm",type:"button",onclick:()=>{sync();startPick();}},t("place"))),
+    dup&&el("div",{class:"alert"},t("dup")+" ",el("b",{text:dup.n}),". ",el("button",{class:"btn ghost sm",type:"button",style:"margin-top:6px",onclick:()=>openSpot(dup.id)},t("dupgo"))),
+    el("label",{class:"f",for:"ad-c"},t("cat"),c),
+    el("div",{class:"grid2"},el("label",{class:"f",for:"ad-a0"},t("amin"),a0),el("label",{class:"f",for:"ad-a1"},t("amax"),a1),el("label",{class:"f",for:"ad-fr"},t("price"),fr),el("label",{class:"f",for:"ad-d"},t("duration"),du)),
+    el("label",{class:"f",for:"ad-io"},t("setting"),io),
+    el("b",{text:t("amen")}),tags,
+    el("label",{class:"f",for:"ad-s"},t("summary"),sum),
+    el("div",{class:"actions"},el("button",{class:"btn",type:"button",onclick:()=>{sync();
+      if(d.n.trim().length<3)return toast(t("needname"));if(!d.pos)return toast(t("needpos"));
+      const id="u"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+      S.my.spots[id]={n:d.n.trim(),la:+d.pos[0].toFixed(5),lo:+d.pos[1].toFixed(5),c:d.c,a0:d.a0,a1:d.a1,fr:d.fr,io:d.io,d:d.d,tg:d.tg,s:d.s.trim(),se:"",ts:Date.now()};
+      S.visited[id]=Date.now();saveState();S.draft=null;closeSheet();go("carte");map.setView(d.pos,Math.max(map.getZoom(),HOSTED?15:11));
+      saveMine().then(()=>toast(t("added"))).catch(()=>{});}},t("send")),
+      el("button",{class:"btn ghost",type:"button",onclick:()=>{S.draft=null;closeSheet();}},t("cancel")))]);
+}
+function startPick(){closeSheet();go("carte");$("pick").classList.add("on");$("pickmsg").textContent=t("pickmsg");$("pickok").textContent=t("ok");$("pickno").textContent=t("cancel");}
+$("pickok").onclick=()=>{const c=map.getCenter();S.draft.pos=[c.lat,c.lng];$("pick").classList.remove("on");openAdd();};
+$("pickno").onclick=()=>{$("pick").classList.remove("on");openAdd();};
+
+/* ---------- passport ---------- */
+function renderPass(){
+  const v=$("v-passeport"),vis=Object.keys(S.visited).map(id=>[spotIndex.get(id),S.visited[id]]).filter(x=>x[0]).sort((a,b)=>b[1]-a[1]);
+  const nRev=Object.keys(S.my.rev).length,nConf=Object.keys(S.my.conf).length,nAdd=Object.keys(S.my.spots).length;
+  const pts=vis.length*10+nRev*15+nConf*5+nAdd*30,lv=levelOf(pts);
+  const catsSeen=new Set(vis.map(x=>cat(x[0]))),cos=new Set(vis.map(x=>x[0].co));
+  const chCat={h:s=>s.io!=="out",p:s=>cat(s)==="nature",e:s=>cat(s)==="baignade",a:s=>cat(s)==="musee"}[SEASON];
+  const chN=Math.min(3,vis.filter(x=>chCat(x[0])&&seasonOf(new Date(x[1]))===SEASON&&Date.now()-x[1]<120*864e5).length);
+  const badges=[["b1",vis.length>=1],["b2",catsSeen.size>=4],["b3",nRev>=3],["b4",nAdd>=1],["b5",nConf>=5],["b6",cos.has("CH")&&cos.has("FR")]];
+  const stamps=el("div",{class:"stamps"},vis.map(x=>{const c=cat(x[0]);return el("button",{class:"stamp",type:"button",style:"color:"+CATS[c].c,onclick:()=>openSpot(x[0].id)},el("span",{html:svg(c).replace(/#fff/g,"currentColor")}),el("span",{text:x[0].n.slice(0,26)}));}),
+    [...Array(Math.max(0,3-vis.length))].map(()=>el("div",{class:"stamp blank"},"?")));
+  v.replaceChildren(el("div",{class:"pad"},
+    el("div",{class:"card level"},el("div",{class:"medal tnum",text:lv.i+1}),el("div",{class:"grow"},el("h2",{text:t("lvl")[lv.i]}),el("div",{class:"muted tnum",text:pts+" "+t("points")+" · "+(lv.next?t("next",lv.next):t("top"))}),el("div",{class:"prog"},el("b",{style:"width:"+lv.pct+"%"})))),
+    el("div",{class:"card"},el("div",{class:"row"},el("div",{class:"grow"},el("b",{class:"muted",style:"font-size:12px;text-transform:uppercase;letter-spacing:.04em",text:t("challenge")}),el("h3",{text:t("ch_"+SEASON)})),el("div",{class:"tnum",style:"font-family:var(--display);font-size:24px",text:chN+"/3"})),el("div",{class:"prog"},el("b",{style:"width:"+chN/3*100+"%;background:var(--sun)"}))),
+    el("h2",{text:t("stamps")}),vis.length?null:el("p",{class:"muted",style:"margin:0",text:t("nostamp")}),stamps,
+    el("h2",{text:t("badges")}),el("div",{class:"badges"},badges.map(b=>el("div",{class:"badge"+(b[1]?" got":"")},el("b",{text:(b[1]?"★ ":"")+t(b[0])}),t(b[0]+"d"))))));
+}
+
+/* ---------- family ---------- */
+function renderFam(){
+  const v=$("v-famille");
+  const yr=el("select",{id:"kid-y"},[...Array(17).keys()].map(i=>el("option",{value:YEAR-i},String(YEAR-i))));
+  if(S.kidYear)yr.value=S.kidYear;yr.onchange=()=>{S.kidYear=yr.value;};
+  const home=el("select",{id:"home"},el("option",{value:""},t("none")),CITIES.map(c=>el("option",{value:c[0]},c[0])));home.value=S.home;
+  home.onchange=()=>{S.home=home.value;saveState();goHome();};
+  const flagged=S.canEdit?[...spotIndex.values()].filter(s=>statsOf(s).reports>0||S.mod.hidden[s.id]):[];
+  v.replaceChildren(el("div",{class:"pad"},
+    el("h2",{text:t("kids")}),
+    el("div",{class:"card",style:"display:flex;flex-direction:column;gap:12px"},
+      S.kids.length?el("div",{class:"chips-wrap"},S.kids.map((y,i)=>el("span",{class:"kid"},(YEAR-y)+" "+t("an")+" · "+y,el("button",{type:"button","aria-label":"×",onclick:()=>{S.kids.splice(i,1);saveState();refresh();}},"×")))):el("p",{class:"muted",style:"margin:0",text:t("nokid")}),
+      el("div",{class:"row"},el("label",{class:"f grow",for:"kid-y"},t("year"),yr),el("button",{class:"btn",type:"button",style:"align-self:flex-end",onclick:()=>{if(S.kids.length<8){S.kids.push(+yr.value);S.kids.sort((a,b)=>a-b);S.useFam=true;saveState();refresh();}}},t("addkid"))),
+      el("small",{class:"muted",text:t("kidshelp")})),
+    el("h2",{text:t("home")}),el("div",{class:"card"},el("label",{class:"f",for:"home"},t("homehelp"),home)),
+    !canContribute()&&S.loaded&&el("div",{class:"alert",text:S.db?t("readonly"):t("offline")}),
+    el("div",{class:"alert",style:"border-left-color:var(--line)",text:t(HOSTED?"localnote":"mapnote")}),
+    S.canEdit&&el("h2",{text:t("mod")}),S.canEdit&&(flagged.length?flagged.map(s=>spotRow(s)):el("p",{class:"muted",style:"margin:0",text:t("modnone")}))));
+}
+
+/* ---------- navigation, search, language ---------- */
+const NAV=[["carte",'<path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>'],["liste",'<path d="M8 6h13M8 12h13M8 18h13M3.500 6h.010M3.500 12h.010M3.500 18h.010" fill="none" stroke="currentColor" stroke-width="2.200" stroke-linecap="round"/>'],["ajouter",'<path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="2.600" stroke-linecap="round"/>'],["passeport",'<rect x="5" y="3" width="14" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>'],["famille",'<circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17" cy="10" r="2.200" fill="none" stroke="currentColor" stroke-width="2"/><path d="M2.500 20c0-3.500 2.500-6 5.500-6s5.500 2.500 5.500 6M14.500 20c0-2.500 1-4.500 3-4.500s3.500 1.500 3.500 4.500" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>']];
+function renderNav(){
+  $("nav").replaceChildren(...NAV.map(([k,p])=>{const add=k==="ajouter",ic='<svg viewBox="0 0 24 24" aria-hidden="true">'+p+"</svg>";
+    return el("button",{type:"button",class:add?"add":"","aria-current":S.view===k?"page":null,onclick:()=>add?startAdd():go(k)},add?el("span",{class:"fab",html:ic}):el("span",{html:ic}),t(k));}));
+}
+function go(v,fromHash){
+  if(!["carte","liste","passeport","famille"].includes(v))v="carte";
+  S.view=v;document.querySelectorAll(".view").forEach(e=>e.classList.toggle("on",e.id==="v-"+v));
+  $("chips").style.display=v==="carte"||v==="liste"?"":"none";
+  if(!fromHash){try{history.replaceState(null,"","#"+v);}catch(e){location.hash=v;}}
+  renderNav();if(v==="carte")setTimeout(()=>map.invalidateSize(),0);refresh();
+}
+window.addEventListener("hashchange",()=>go(location.hash.slice(1),true));
+function applyLang(){document.documentElement.lang=S.lang;$("lang").textContent=S.lang==="fr"?"EN":"FR";$("q").placeholder=t("search");$("q").setAttribute("aria-label",t("search"));renderNav();}
+$("lang").onclick=()=>{S.lang=S.lang==="fr"?"en":"fr";saveState();applyLang();closeSheet();refresh();};
+const norm=s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+$("q").addEventListener("input",e=>{
+  const q=norm(e.target.value.trim()),box=$("results");if(q.length<2){box.hidden=true;return;}
+  const cities=CITIES.filter(c=>norm(c[0]).includes(q)).slice(0,4),spots=[...spotIndex.values()].filter(s=>norm(s.n).includes(q)||norm(s.r).includes(q)).slice(0,8);
+  const done=()=>{box.hidden=true;e.target.value="";e.target.blur();};
+  box.replaceChildren(...cities.map(c=>el("button",{type:"button",onclick:()=>{done();go("carte");map.setView([c[1],c[2]],10);}},el("span",{},el("b",{text:c[0]}),el("br"),el("small",{text:t("carte")})))),
+    ...spots.map(s=>el("button",{type:"button",onclick:()=>{done();go("carte");map.setView([s.la,s.lo],Math.max(map.getZoom(),10));openSpot(s.id);}},el("span",{class:"dot",style:"flex:none;width:10px;height:10px;border-radius:50%;background:"+CATS[cat(s)].c}),el("span",{},el("b",{text:s.n}),el("br"),el("small",{text:s.r})))));
+  box.hidden=!box.children.length;
+});
+
+/* ---------- start ---------- */
+loadLocal();initMap();applyLang();
+go(location.hash.slice(1),true);if(S.home)goHome();
+connect();
+if(HOSTED&&"serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
