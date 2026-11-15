@@ -1,5 +1,5 @@
 // Offline support: the app shell and the spots are cached, map tiles are cached as you browse them.
-const SHELL = "ribambelle-shell-v1", TILES = "ribambelle-tiles-v1", MAX_TILES = 1200;
+const SHELL = "ribambelle-shell-v2", TILES = "ribambelle-tiles-v2", MAX_TILES = 1200;
 const CORE = ["./", "index.html", "spots.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"];
@@ -9,7 +9,7 @@ async function trim(cache) { const keys = await cache.keys(); if (keys.length > 
 self.addEventListener("fetch", e => {
   const req = e.request; if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.hostname === "tile.openstreetmap.org") {
+  if (url.hostname.endsWith("basemaps.cartocdn.com")) {
     e.respondWith(caches.open(TILES).then(async c => { const hit = await c.match(req); if (hit) return hit;
       const res = await fetch(req); if (res.ok || res.type === "opaque") { c.put(req, res.clone()); trim(c); } return res; }));
     return;
