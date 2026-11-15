@@ -1,5 +1,5 @@
 // Offline support: the app shell and the spots are cached, map tiles are cached as you browse them.
-const SHELL = "ribambelle-shell-v2", TILES = "ribambelle-tiles-v2", MAX_TILES = 1200;
+const SHELL = "ribambelle-shell-v3", TILES = "ribambelle-tiles-v2", MAX_TILES = 1200;
 const CORE = ["./", "index.html", "spots.json", "manifest.webmanifest", "icon.svg", "icon-192.png",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"];
@@ -15,7 +15,7 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (url.origin === location.origin) { // network first, so updates arrive; cache when offline
-    e.respondWith(fetch(req).then(res => { if (res.ok) caches.open(SHELL).then(c => c.put(req, res.clone())); return res; }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match("index.html"))));
+    e.respondWith(fetch(url.href, { cache: "no-cache" }).then(res => { if (res.ok) caches.open(SHELL).then(c => c.put(req, res.clone())); return res; }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match("index.html"))));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => { if (res.ok || res.type === "opaque") caches.open(SHELL).then(c => c.put(req, res.clone())); return res; })));

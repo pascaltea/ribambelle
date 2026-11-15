@@ -922,7 +922,7 @@ label.f input,label.f select,label.f textarea{border:1px solid var(--line);borde
       onSnapshot:n=>{const f=()=>n(snap(p));subs.push(f);setTimeout(f,0);return()=>{};}}),
     collection:c=>({path:c,onSnapshot:n=>{const f=()=>{if(c==="spots"&&!seeds)return;n(col(c));};subs.push(f);setTimeout(f,0);return()=>{};}})
   };
-  fetch("spots.json").then(r=>r.json()).then(j=>{seeds=Array.isArray(j)?j:[];fire();}).catch(()=>{seeds=[];fire();});
+  fetch("spots.json",{cache:"no-cache"}).then(r=>r.json()).then(j=>{seeds=Array.isArray(j)?j:[];fire();}).catch(()=>{seeds=[];fire();});
   window.claude={use:async n=>n==="db"?db:n==="user"?{id:async()=>uid,canEdit:async()=>false,can:async()=>true}:null};
 })();
 </script>
@@ -1391,7 +1391,9 @@ $("q").addEventListener("input",e=>{
 loadLocal();initMap();applyLang();
 go(location.hash.slice(1),true);if(S.home)goHome();
 connect();
-if(HOSTED&&"serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+if(HOSTED&&"serviceWorker" in navigator){const sw=navigator.serviceWorker,had=!!sw.controller;let once=false;
+  sw.addEventListener("controllerchange",()=>{if(had&&!once){once=true;location.reload();}});
+  sw.register("sw.js").then(r=>r.update()).catch(()=>{});}
 </script>
 </body>
 </html>
