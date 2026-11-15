@@ -773,6 +773,9 @@ main{flex:1;position:relative;min-height:0}
 #zoom{position:absolute;right:16px;bottom:16px;z-index:500;display:flex;flex-direction:column;gap:8px}
 .tiles .leaflet-control-attribution{background:var(--surface)!important;border-radius:8px 0 0 0;padding:1px 6px}
 .tiles .leaflet-control-attribution a{color:inherit}
+.tiles .leaflet-tile-pane{filter:saturate(.55) brightness(1.04)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tiles .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.5) brightness(.92) contrast(.88)}}
+:root[data-theme="dark"] .tiles .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.5) brightness(.92) contrast(.88)}
 #zoom button{width:40px;height:40px;border-radius:50%;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:20px;font-weight:700}
 #note{position:absolute;left:16px;right:16px;top:12px;z-index:500;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:10px;padding:8px 12px;font-size:13px;box-shadow:var(--shadow)}
 #pick{position:absolute;inset:0;z-index:600;pointer-events:none;display:none}
@@ -1141,8 +1144,7 @@ function initMap(){
   map.attributionControl.setPrefix(false);
   if(HOSTED){
     $("map").classList.add("tiles");
-    const th=document.documentElement.dataset.theme,dark=th==="dark"||(!th&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/"+(dark?"dark_all":"rastertiles/voyager")+"/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'}).addTo(map);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(map);
     if(navigator.geolocation){const b=$("loc");b.hidden=false;let me=null;b.onclick=()=>navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];
       if(me)me.setLatLng(ll);else me=L.circleMarker(ll,{radius:8,color:"#fff",weight:3,fillColor:"#1C7ED6",fillOpacity:1,interactive:false}).addTo(map);map.setView(ll,12);},()=>toast(t("locerr")),{enableHighAccuracy:true,timeout:10000});}
   }else map.attributionControl.addAttribution("Natural Earth");
@@ -1156,7 +1158,7 @@ function initMap(){
   const z=()=>{const e=$("map").classList,zz=map.getZoom();e.toggle("z-far",zz<7);e.toggle("z-near",zz>=(HOSTED?11:9));};
   $("map").classList.add("intro");setTimeout(()=>$("map").classList.remove("intro"),2500);
   map.on("zoomend",z);map.on("moveend",()=>{if(S.view==="liste")renderList();});
-  map.fitBounds([[43.2,-1.5],[49.5,9.5]]);z();
+  if(HOSTED)map.setView([46.6,6.85],8);else map.fitBounds([[43.2,-1.5],[49.5,9.5]]);z();
   $("zin").onclick=()=>map.zoomIn();$("zout").onclick=()=>map.zoomOut();
 }
 function goHome(){const c=CITIES.find(c=>c[0]===S.home);if(c&&map)map.setView([c[1],c[2]],9);}
